@@ -1,8 +1,7 @@
-// NexusOne AI Engine - Vercel Backend Logic
-export default async function handler(req, res) {
-  // CORS Headers for Mobile & App Request Support
+export default function handler(req, res) {
+  // CORS Headers mobile apps aur browser ke liye
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -11,16 +10,13 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const { prompt } = req.body;
+      const { prompt } = req.body || {};
 
       if (!prompt) {
         return res.status(400).json({ error: "Arre bhai, kuch toh pucho!" });
       }
 
-      // --- AGENT 1: Research Agent (Scanning for free methods) ---
-      const researchData = `NexusOne AI ne internet ko scan karke "${prompt}" ka 100% free aur active bypass dhoondh liya hai.`;
-
-      // --- AGENT 2 & 3: Mastermind & Teacher Agent (Aasaan Hinglish Solution) ---
+      // --- AGENTS LOGIC ---
       const solutionPlan = `Bhai sun! Tune pucha: "${prompt}".\n\nIska 100% free aur 0 rupaye wala setup yeh hai:\n\n` +
         `• Step 1: Kisi paid version ke chakkar me mat padna. Direct hamare bataye free tool/API par jao.\n` +
         `• Step 2: Sabhi steps ko chhote-chhote parts me follow karo aur koi paisa mat do.\n` +
@@ -29,7 +25,6 @@ export default async function handler(req, res) {
       return res.status(200).json({
         status: "success",
         app: "NexusOne AI Engine",
-        research: researchData,
         solution: solutionPlan
       });
 
@@ -38,5 +33,6 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.status(200).send("NexusOne AI Engine is Live on Vercel!");
+  // Aise GET request aayegi toh screen par ye dikhega (Test karne ke liye)
+  return res.status(200).send("NexusOne AI Engine is Live & Running on Vercel!");
 }
