@@ -1,0 +1,10 @@
+{
+  "name": "nexusone-ai",
+  "version": "1.0.0",
+  "description": "NexusOne AI Multi-Agent Backend",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js"
+  },
+  "dependencies": {}
+}
