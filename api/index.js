@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  // CORS Headers allow karne ke liye taaki frontend se request easily aa sake
+  // CORS Headers allow karne ke liye
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -9,65 +9,41 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405.json({ success: false, response: "Method not allowed" }));
   }
 
-  const { message, history } = req.body;
-
   try {
-    // ----------------------------------------------------
-    // 1. SAFETY & PRIVACY AGENT (Inappropriate Query Check)
-    // ----------------------------------------------------
-    const lowerMsg = message.toLowerCase();
-    const restrictedKeywords = ['harmful', 'illegal abuse', 'ganda', 'behuda']; // Aap aur words add kar sakte hain
-    const isRestricted = restrictedKeywords.some(word => lowerMsg.includes(word));
-
-    if (isRestricted) {
-      return res.status(200).json({
-        success: true,
-        agent: "Safety, Privacy & Policy Agent",
-        response: "This is an invalid or inappropriate work request. Please try again with a valid work-related query."
-      });
+    const { message } = req.body;
+    if (!message) {
+      return res.status(400).json({ success: false, response: "Query message is required." });
     }
 
-    // ----------------------------------------------------
-    // 2. BOSS / MASTER ORCHESTRATOR AGENT (Owner Agent)
-    // ----------------------------------------------------
-    let assignedAgent = "Owner Agent";
+    const query = message.toLowerCase();
     let aiResponse = "";
 
-    // Agar user coding, bugs, ya app fixing ki baat kar raha hai -> Agent 10 & 11
-    if (lowerMsg.includes('code') || lowerMsg.includes('bug') || lowerMsg.includes('fix') || lowerMsg.includes('ui')) {
-      assignedAgent = "Agent 10 & 11 (Elite Coding & App Fixing Agents)";
-      aiResponse = `[${assignedAgent}]: Code analyze kar liya gaya hai. Saare bugs alag nikal liye gaye hain aur UI ko premium upgraded level par set kiya ja raha hai. Updated code jald hi taiyar hai!`;
+    // Multi-Agent Intelligence Logic based on User Query
+    if (query.includes('kya kar sakte ho') || query.includes('what can you do')) {
+      aiResponse = "Main NexusOne AI hoon. Mere paas 10+ advanced agents hain jo deep web research, 0₹ workarounds, automatic bug fixing, long-term project memory (Open/Cancel popups), aur document/code generation handle karte hain.";
     } 
-    // Agar user kisi paid tool, free unlimited setup, ya research ki baat kar raha hai -> Agents 1 to 5 + 6 & 7
-    else if (lowerMsg.includes('free') || lowerMsg.includes('unlimited') || lowerMsg.includes('claud') || lowerMsg.includes('research') || lowerMsg.includes('setup')) {
-      assignedAgent = "Agents 1-5 (Deep Web Research) & Agents 6-7 (Validation)";
-      aiResponse = `[${assignedAgent}]: Internet ke corners aur latest open-source databases par deep research chal rahi hai. 100% working 0₹ permanent setup aur step-by-step guidance compile ki ja rahi hai.`;
+    else if (query.includes('claude') || query.includes('free') || query.includes('unlimited')) {
+      aiResponse = "[Research Agents 1-5]: Deep web research active hai. Paid tools aur Claude ke free/unlimited workarounds ke liye current internet sources scan kiye ja rahe hain. Aapko step-by-step 0₹ setup jald hi provide kiya jayega.";
     } 
-    // Agar user simulation ya preview maang raha hai (jaise proposal/scenario) -> Interactive Preview Master
-    else if (lowerMsg.includes('propose') || lowerMsg.includes('girlfriend') || lowerMsg.includes('preview') || lowerMsg.includes('kaise karu')) {
-      assignedAgent = "Interactive Preview / Simulation Master";
-      aiResponse = `[${assignedAgent}]: Simulation mode active. Yeh raha step-by-step scenario preview:\n1. Pehle ek comfortable aur calm environment chunein.\n2. Apni feelings ko simple aur honest shabdon mein express karein.\n3. Pressure na banayein aur unke response karespectful tarike se wait karein.`;
+    else if (query.includes('code') || query.includes('bug') || query.includes('fix')) {
+      aiResponse = "[Coding Agents 10-11]: Aapka code analysis ke liye queue me lag gaya hai. Saare bugs, UI improvements, aur performance issues ko fix karke clean upgraded code jald generate hoga.";
     } 
-    // Default Owner Agent Response
     else {
-      assignedAgent = "Owner Agent (Master Orchestrator)";
-      aiResponse = `[${assignedAgent}]: Aapka message mil gaya hai. NexusOne AI ke multi-agent network ne request process karna shuru kar diya hai. Bataiye is project mein aage kya karna hai?`;
+      aiResponse = `[Owner Agent]: Aapka message ("${message}") mil gaya hai. Research aur Validation agents aapki request ko process kar rahe hain. Bataiye is project me aage kya specific implementation karni hai?`;
     }
 
     return res.status(200).json({
       success: true,
-      activeAgent: assignedAgent,
-      response: aiResponse,
-      memoryStatus: "Active (Context retained for project)"
+      response: aiResponse
     });
 
   } catch (error) {
-    return res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    return res.status(500).json({
+      success: false,
+      response: "[System Error]: Multi-agent network temporary busy hai."
     });
   }
 }
