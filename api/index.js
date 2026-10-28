@@ -1,3 +1,4 @@
+// NexusOne AI updated backend. Copy this entire file into api/index.js
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const GROQ_MODEL = "openai/gpt-oss-20b";
@@ -107,18 +108,33 @@ async function geminiResearch(query) {
   return { text, sources };
 }
 
-async function geminiTTS(text) {
+function pcmToWav(pcm, sampleRate = 24000, channels = 1, bitsPerSample = 16) {
+  const data = Buffer.from(pcm);
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0); header.writeUInt32LE(36 + data.length, 4);
+  header.write('WAVE', 8); header.write('fmt ', 12); header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); header.writeUInt16LE(channels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * channels * bitsPerSample / 8, 28);
+  header.writeUInt16LE(channels * bitsPerSample / 8, 32);
+  header.writeUInt16LE(bitsPerSample, 34); header.write('data', 36);
+  header.writeUInt32LE(data.length, 40);
+  return Buffer.concat([header, data]);
+}
+
+async function geminiTTS(text, voice = "Achird", language = "auto", speed = 0.9) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY is missing in Vercel.");
   const url = `${GEMINI_BASE}/${GEMINI_TTS_MODEL}:generateContent?key=${encodeURIComponent(key)}`;
+  const langPrompt = language && language !== "auto" ? `Speak in ${language}. ` : "Detect and speak the language used in the text. ";
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: text.slice(0, 12000) }] }],
+      contents: [{ parts: [{ text: `${langPrompt}Speak clearly at a slightly slow, natural pace. Read the following text exactly, without adding commentary:\n${text.slice(0, 8000)}` }] }],
       generationConfig: {
         responseModalities: ["AUDIO"],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } }
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice || "Achird" } } }
       }
     }),
     signal: AbortSignal.timeout(60000)
@@ -126,7 +142,50 @@ async function geminiTTS(text) {
   const data = await readJsonResponse(response);
   const audio = (data?.candidates?.[0]?.content?.parts || []).find(p => p.inlineData?.data)?.inlineData;
   if (!audio?.data) throw new Error("Gemini TTS returned no audio.");
-  return { mimeType: audio.mimeType || "audio/L16;rate=24000", audioBase64: audio.data };
+  let bytes = Buffer.from(audio.data, "base64");
+  const mime = String(audio.mimeType || "").toLowerCase();
+  if (mime.includes("l16") || mime.includes("pcm")) {
+    const rateMatch = mime.match(/rate=(\d+)/);
+    bytes = pcmToWav(bytes, rateMatch ? Number(rateMatch[1]) : 24000);
+  }
+  return { mimeType: mime.includes("wav") || mime.includes("l16") || mime.includes("pcm") ? "audio/wav" : (audio.mimeType || "audio/wav"), audioBase64: bytes.toString("base64"), provider: "gemini" };
+}
+
+async function groqTTS(text, speed = 0.9) {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) throw new Error("GROQ_API_KEY is missing in Vercel.");
+  const response = await fetch("https://api.groq.com/openai/v1/audio/speech", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "canopylabs/orpheus-v1-english",
+      voice: "autumn",
+      input: text.slice(0, 4000),
+      response_format: "wav",
+      speed: Math.max(0.5, Math.min(1.5, Number(speed) || 0.9))
+    }),
+    signal: AbortSignal.timeout(60000)
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    console.error("Groq TTS failed:", response.status, err.slice(0, 200));
+    throw new Error("Groq TTS is currently unavailable.");
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  return { mimeType: "audio/wav", audioBase64: bytes.toString("base64"), provider: "groq" };
+}
+
+async function makeSpeech(text, voice, language, speed) {
+  try {
+    return await geminiTTS(text, voice, language, speed);
+  } catch (e) {
+    console.error("Gemini TTS failed; trying Groq fallback:", e?.message || "unknown");
+    try { return await groqTTS(text, speed); }
+    catch (fallbackError) {
+      console.error("Groq TTS fallback failed:", fallbackError?.message || "unknown");
+      throw new Error("Gemini aur Groq dono ka server TTS abhi available nahi hai. App ka built-in speech fallback use karein.");
+    }
+  }
 }
 
 function wantsCode(message) {
@@ -250,8 +309,11 @@ export default async function handler(req, res) {
     if (action === "tts") {
       const text = typeof body.text === "string" ? body.text.trim() : "";
       if (!text) return sendError(res, 400, "TTS text is required.");
-      if (text.length > 12000) return sendError(res, 413, "TTS text is too long.");
-      return res.status(200).json({ success: true, action: "tts", ...(await geminiTTS(text)) });
+      if (text.length > 8000) return sendError(res, 413, "TTS text is too long.");
+      const voice = typeof body.voice === "string" ? body.voice.slice(0, 40) : "Achird";
+      const language = typeof body.language === "string" ? body.language.slice(0, 30) : "auto";
+      const speed = Number(body.speed || 0.9);
+      return res.status(200).json({ success: true, action: "tts", ...(await makeSpeech(text, voice, language, speed)) });
     }
     if (action !== "chat") return sendError(res, 400, "Unsupported action.");
 
